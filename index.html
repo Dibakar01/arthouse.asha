@@ -648,6 +648,28 @@
         const [toast, setToast] = useState(null);
         const toastRef = useRef();
 
+        // Secret sequence: type the SECRET anywhere on the page to open admin login
+        useEffect(() => {
+          const SECRET = "adminisart";
+          let buffer = "";
+          let timer;
+          const handler = ev => {
+            // Ignore if user is typing in an input/textarea
+            if (["INPUT", "TEXTAREA"].includes(ev.target.tagName)) return;
+            buffer += ev.key.toLowerCase();
+            buffer = buffer.slice(-SECRET.length);
+            clearTimeout(timer);
+            timer = setTimeout(() => { buffer = ""; }, 1200);
+            if (buffer === SECRET) {
+              buffer = "";
+              if (isAdmin) setIsAdmin(false);
+              else setModal("login");
+            }
+          };
+          window.addEventListener("keydown", handler);
+          return () => window.removeEventListener("keydown", handler);
+        }, [isAdmin]);
+
         // ── Firebase subscriptions ─────────────────────────────────────────────
         useEffect(() => {
           if (IS_DEMO) return;
