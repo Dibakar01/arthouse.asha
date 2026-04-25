@@ -399,7 +399,7 @@
         const clearImg = () => { setPreview(null); setImgChanged(true); };
 
         const submit = async () => {
-          if (!form.title.trim() || !form.price.trim()) { alert("Title and price are required."); return; }
+          if (!form.title.trim()) { alert("Title is required."); return; }
           setSaving(true);
           try {
             await onSave(form, imgChanged ? preview : undefined, isEdit ? initial.id : null);
@@ -418,7 +418,7 @@
           h(Field, { label: "Medium" },
             h("input", { value: form.medium, onChange: setF("medium"), placeholder: "e.g. Oil on Canvas", style: inputSx })
           ),
-          h(Field, { label: "Price *" },
+          h(Field, { label: "Price" },
             h("input", { value: form.price, onChange: setF("price"), placeholder: "e.g. ₹18,000", style: inputSx })
           ),
           h(Field, { label: "Description" },
@@ -500,7 +500,9 @@
             h("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 10, borderTop: `1px solid ${C.border}` } },
               a.sold
                 ? h("span", { style: { fontFamily: sans, fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: C.terra, fontWeight: 500 } }, "Sold")
-                : h("span", { style: { fontFamily: serif, fontSize: 17, fontWeight: 700, color: C.deep } }, a.price),
+                : a.price
+                  ? h("span", { style: { fontFamily: serif, fontSize: 17, fontWeight: 700, color: C.deep } }, a.price)
+                  : h("span", { style: { fontFamily: sans, fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: C.char, opacity: 0.4 } }, "Price on enquiry"),
 
               a.sold
                 ? h("span", { style: { fontFamily: sans, fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", padding: "6px 13px", borderRadius: 2, background: "#C5BAB0", color: "white", display: "inline-flex", alignItems: "center", gap: 5, fontWeight: 500 } }, "Sold")
