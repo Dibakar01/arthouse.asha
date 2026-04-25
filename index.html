@@ -650,7 +650,7 @@
 
         // Secret sequence: type the SECRET anywhere on the page to open admin login
         useEffect(() => {
-          const SECRET = "adminisart";
+          const SECRET = "admin";
           let buffer = "";
           let timer;
           const handler = ev => {
@@ -775,12 +775,7 @@
                 h("button", { key: s, onClick: () => setSection(s), style: { fontFamily: sans, fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", background: "none", border: "none", cursor: "pointer", color: section === s ? C.ochre : C.char, opacity: section === s ? 1 : 0.6, fontWeight: section === s ? 500 : 400, padding: "4px 0", borderBottom: section === s ? `1px solid ${C.ochre}` : "1px solid transparent", transition: "all 0.15s" } },
                   s.charAt(0).toUpperCase() + s.slice(1)
                 )
-              ),
-              h("button", {
-                onClick: () => isAdmin ? setIsAdmin(false) : setModal("login"),
-                title: isAdmin ? "Exit admin" : "Admin login",
-                style: { width: 34, height: 34, borderRadius: "50%", border: `1.5px solid ${isAdmin ? C.ochre : C.border}`, background: isAdmin ? C.ochre : "transparent", color: isAdmin ? "white" : C.char, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, transition: "all 0.18s" },
-              }, "\u2699")
+              )
             )
           ),
 
