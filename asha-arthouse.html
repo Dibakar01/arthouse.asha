@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Asha Arthouse</title>
+  <meta name="description" content="Original paintings by Asha Prasad — oil, watercolour, Tanjore, abstract. Enquire via WhatsApp." />
+  <meta property="og:title" content="Asha Arthouse" />
+  <meta property="og:description" content="Original works by Asha Prasad. Enquire via WhatsApp." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;1,500;1,700&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet" />
+
+  <!-- Firebase 9 compat (script-tag friendly, no build step) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+  <!-- React 18 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { background: #F4EFE6; font-family: 'Jost', system-ui, sans-serif; -webkit-font-smoothing: antialiased; color: #2D2416; }
+    #root { min-height: 100vh; }
+    input, textarea, button, select { font-family: inherit; }
+    input:focus, textarea:focus { border-color: #B07D2E !important; outline: none; }
+    button:focus-visible { outline: 2px solid #B07D2E; outline-offset: 2px; }
+    a { text-decoration: none; color: inherit; }
+    img { display: block; max-width: 100%; }
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: #F4EFE6; }
+    ::-webkit-scrollbar-thumb { background: rgba(176,125,46,0.28); border-radius: 3px; }
+    .art-card { transition: transform 0.24s ease, box-shadow 0.24s ease; }
+    .art-card:hover { transform: translateY(-4px); box-shadow: 0 10px 36px rgba(26,18,9,0.09); }
+    @media (max-width: 640px) {
+      .hero-h1 { font-size: 40px !important; }
+      .gallery-grid { grid-template-columns: 1fr !important; }
+      .about-grid { grid-template-columns: 1fr !important; }
+      .nav-pad { padding: 0 20px !important; }
+      .section-pad { padding-left: 20px !important; padding-right: 20px !important; }
+    }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<!--
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║  ASHA ARTHOUSE — DEPLOYMENT GUIDE                                            ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║                                                                               ║
+║  STEP 1 — Firebase setup (free, no credit card)                              ║
+║  ─────────────────────────────────────────────                               ║
+║  a. Go to https://console.firebase.google.com                                ║
+║  b. Create a new project (any name)                                          ║
+║  c. Build → Realtime Database → Create Database                              ║
+║     → Choose your region → Start in TEST MODE → Enable                       ║
+║  d. Go to Project Settings (⚙ icon) → General → Your apps → Add app → Web   ║
+║  e. Register the app (any nickname), copy the firebaseConfig object          ║
+║  f. Paste it into FIREBASE_CONFIG below                                      ║
+║                                                                               ║
+║  STEP 2 — Passcode                                                           ║
+║  ─────────────────                                                           ║
+║  Change ADMIN_PASSCODE to something personal. This is a client-side check    ║
+║  suitable for a personal gallery. Do not use a banking password.             ║
+║                                                                               ║
+║  STEP 3 — Deploy                                                             ║
+║  ───────────────                                                             ║
+║  Drop this single HTML file on any static host:                              ║
+║    · Netlify:       drag-and-drop at app.netlify.com                        ║
+║    · Vercel:        vercel deploy (CLI) or import repo                       ║
+║    · GitHub Pages:  push to /docs, enable Pages in repo settings            ║
+║                                                                               ║
+║  STEP 4 — Firebase security rules (optional, recommended)                   ║
+║  ─────────────────────────────────────────────────────────                   ║
+║  In Firebase Console → Realtime Database → Rules, paste:                    ║
+║  {                                                                           ║
+║    "rules": {                                                                ║
+║      "artworks": { ".read": true, ".write": true },                         ║
+║      "images":   { ".read": true, ".write": true }                          ║
+║    }                                                                         ║
+║  }                                                                           ║
+║                                                                               ║
+║  DONE — gallery is live, admin changes are real-time for all visitors        ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+-->
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  CONFIGURATION — edit before deploying
+// ═══════════════════════════════════════════════════════
+
+const FIREBASE_CONFIG = {
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
+  databaseURL:       "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId:             "YOUR_APP_ID",
+};
+
+const ADMIN_PASSCODE = "asha2024";   // ← change this before going live
+const WA_NUMBER      = "918593020077"; // WhatsApp with country code, no +
+
+// ═══════════════════════════════════════════════════════
+
+const IS_DEMO = FIREBASE_CONFIG.apiKey === "YOUR_API_KEY";
+
+let db = null;
+if (!IS_DEMO) {
+  firebase.initializeApp(FIREBASE_CONFIG);
+  db = firebase.database();
+}
+
+// ── Demo data (shown when Firebase not configured) ───────────────────────────
+const DEMO_ARTWORKS = [
+  { id:"d1", title:"Evening Bloom",     medium:"Oil on Canvas",     price:"₹18,000", sold:false, desc:"A luminous study of flowers bathed in warm evening light.", hasImage:false, createdAt:1 },
+  { id:"d2", title:"Forest Serenity",   medium:"Watercolour",       price:"₹12,500", sold:false, desc:"Inspired by the quiet stillness of a forest lake at dusk.", hasImage:false, createdAt:2 },
+  { id:"d3", title:"Saraswati in Gold", medium:"Tanjore on Board",  price:"₹38,000", sold:true,  desc:"A classical Tanjore with intricate gold leaf detailing.",   hasImage:false, createdAt:3 },
+  { id:"d4", title:"Tangerine Dusk",    medium:"Acrylic on Canvas", price:"₹22,000", sold:false, desc:"The glowing warmth of a tangerine sky meeting the horizon.", hasImage:false, createdAt:4 },
+  { id:"d5", title:"Abstract Embrace",  medium:"Mixed Media",       price:"₹28,000", sold:false, desc:"A Cubist-inspired exploration of human connection and form.", hasImage:false, createdAt:5 },
+  { id:"d6", title:"Morning Roses",     medium:"Oil on Canvas",     price:"₹16,500", sold:true,  desc:"Delicate roses rendered in the soft diffuse light of morning.",hasImage:false, createdAt:6 },
+];
+</script>
+
+<script>
+(function () {
+  "use strict";
+  const { useState, useEffect, useRef } = React;
+  const h = React.createElement;
+
+  // ── Tokens ─────────────────────────────────────────────────────────────────
+  const C = {
+    cream:  "#F4EFE6",
+    deep:   "#1A1209",
+    char:   "#2D2416",
+    ochre:  "#B07D2E",
+    ochreA: "rgba(176,125,46,0.11)",
+    border: "rgba(176,125,46,0.2)",
+    card:   "#FDFAF6",
+    terra:  "#8B3E2F",
+    soldOv: "rgba(26,18,9,0.56)",
+  };
+  const serif = "'Playfair Display', Georgia, serif";
+  const sans  = "'Jost', system-ui, sans-serif";
+  const PH    = ["#E8DDD0","#D8CBBA","#C9BEA9","#DDD4C0","#E0D3C3","#CABFAD","#D6CEBC"];
+
+  // ── Image compression ───────────────────────────────────────────────────────
+  function compressImage(file, cb) {
+    const MAX_PX = 900, QUALITY = 0.76;
+    const url = URL.createObjectURL(file);
+    const img  = new Image();
+    img.onload = () => {
+      let { naturalWidth: w, naturalHeight: hh } = img;
+      if (w > MAX_PX) { hh = Math.round(hh * MAX_PX / w); w = MAX_PX; }
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = hh;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, hh);
+      cb(canvas.toDataURL("image/jpeg", QUALITY));
+      URL.revokeObjectURL(url);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); cb(null); };
+    img.src = url;
+  }
+
+  // ── WhatsApp link ───────────────────────────────────────────────────────────
+  function waLink(a) {
+    const msg = `Hi Asha! I found your artwork *${a.title}* (${a.medium} · ${a.price}) on your website and I'd love to know more.`;
+    return `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(msg)}`;
+  }
+
+  // ── Firebase helpers ────────────────────────────────────────────────────────
+  const DB = {
+    set:    (path, val) => db.ref(path).set(val),
+    update: (path, val) => db.ref(path).update(val),
+    remove: (path)      => db.ref(path).remove(),
+    sub: (path, cb) => {
+      const ref = db.ref(path);
+      ref.on("value", snap => cb(snap.val()), () => cb(null));
+      return () => ref.off("value");
+    },
+  };
+
+  // ── WA SVG ──────────────────────────────────────────────────────────────────
+  function WaIcon() {
+    return h("svg",{width:12,height:12,viewBox:"0 0 24 24",fill:"currentColor",style:{flexShrink:0}},
+      h("path",{d:"M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"})
+    );
+  }
+
+  // ── Primitive: Btn ──────────────────────────────────────────────────────────
+  function Btn({ children, onClick, v = "ghost", small, disabled, style: sx = {} }) {
+    const base = {
+      fontFamily: sans, cursor: disabled ? "default" : "pointer",
+      letterSpacing: "0.1em", textTransform: "uppercase", borderRadius: 2,
+      display: "inline-flex", alignItems: "center", gap: 5,
+      transition: "opacity 0.15s", userSelect: "none",
+      opacity: disabled ? 0.5 : 1, pointerEvents: disabled ? "none" : "auto",
+    };
+    const sz = small
+      ? { fontSize: 9,  padding: "4px 10px" }
+      : { fontSize: 11, padding: "8px 18px" };
+    const variants = {
+      primary: { background: C.deep,  color: "white", border: "none" },
+      ochre:   { background: C.ochre, color: "white", border: "none" },
+      ghost:   { background: "transparent", color: C.char, border: `1px solid ${C.border}` },
+      danger:  { background: "transparent", color: C.terra, border: `1px solid ${C.terra}` },
+    };
+    return h("button", { onClick, disabled, style: { ...base, ...sz, ...(variants[v] || variants.ghost), ...sx }}, children);
+  }
+
+  // ── Primitive: FieldInput ───────────────────────────────────────────────────
+  function Field({ label, children }) {
+    return h("div", { style: { marginBottom: 14 }},
+      h("label", { style: { display: "block", fontFamily: sans, fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", color: C.ochre, marginBottom: 5, fontWeight: 500 }}, label),
+      children
+    );
+  }
+
+  const inputSx = { width: "100%", fontFamily: sans, fontSize: 14, padding: "9px 13px", border: `1px solid ${C.border}`, borderRadius: 2, background: C.card, color: C.deep };
+
+  // ── Modal shell ─────────────────────────────────────────────────────────────
+  function Modal({ onClose, children, maxW = 460 }) {
+    // Trap scroll
+    useEffect(() => {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => { document.body.style.overflow = prev; };
+    }, []);
+
+    return h("div", {
+      onClick: onClose,
+      style: { position: "fixed", inset: 0, background: "rgba(26,18,9,0.76)", zIndex: 900, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "60px 20px 40px", overflowY: "auto" },
+    },
+      h("div", {
+        onClick: ev => ev.stopPropagation(),
+        style: { background: C.cream, borderRadius: 4, padding: "36px 40px", width: "100%", maxWidth: maxW, flexShrink: 0, position: "relative" },
+      }, children)
+    );
+  }
+
+  function MHead({ title, sub }) {
+    return h("div", { style: { marginBottom: 24 }},
+      h("h2", { style: { fontFamily: serif, fontSize: 22, fontWeight: 700, color: C.deep, marginBottom: sub ? 4 : 0 }}, title),
+      sub && h("p", { style: { fontFamily: sans, fontSize: 13, fontWeight: 300, color: C.char, opacity: 0.6, lineHeight: 1.6 }}, sub)
+    );
+  }
+
+  function ModalFooter({ children }) {
+    return h("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 24 }}, children);
+  }
+
+  // ── LoginModal ──────────────────────────────────────────────────────────────
+  function LoginModal({ onSuccess, onClose }) {
+    const [val, setVal] = useState("");
+    const [err, setErr] = useState(false);
+    const [attempts, setAttempts] = useState(0);
+
+    const submit = () => {
+      if (val === ADMIN_PASSCODE) {
+        onSuccess();
+      } else {
+        setErr(true);
+        setVal("");
+        setAttempts(n => n + 1);
+      }
+    };
+
+    return h(Modal, { onClose },
+      h(MHead, { title: "Admin Access", sub: "Enter your passcode to manage the gallery." }),
+      h("input", {
+        type: "password", autoFocus: true, value: val, placeholder: "Passcode",
+        onChange: ev => { setVal(ev.target.value); setErr(false); },
+        onKeyDown: ev => ev.key === "Enter" && submit(),
+        style: { ...inputSx, border: `1px solid ${err ? "#B03030" : C.border}`, marginBottom: err ? 6 : 0 },
+      }),
+      err && h("p", { style: { color: "#A83030", fontSize: 12, marginBottom: 0 }},
+        attempts >= 3 ? "Multiple failed attempts. Check the passcode in your HTML file." : "Incorrect passcode."
+      ),
+      h(ModalFooter, null,
+        h(Btn, { onClick: onClose }, "Cancel"),
+        h(Btn, { onClick: submit, v: "primary" }, "Enter")
+      )
+    );
+  }
+
+  // ── ArtworkFormModal ────────────────────────────────────────────────────────
+  function ArtworkFormModal({ initial, existingImg, onSave, onClose }) {
+    const isEdit = !!initial;
+    const [form, setForm] = useState({
+      title:  initial?.title  || "",
+      medium: initial?.medium || "",
+      price:  initial?.price  || "",
+      desc:   initial?.desc   || "",
+    });
+    const [preview, setPreview] = useState(existingImg || null);
+    const [imgChanged, setImgChanged] = useState(false);
+    const [saving, setSaving]   = useState(false);
+    const fileRef = useRef();
+
+    const setF = k => ev => setForm(p => ({ ...p, [k]: ev.target.value }));
+
+    const handleFile = ev => {
+      const f = ev.target.files[0];
+      if (!f) return;
+      compressImage(f, b64 => {
+        if (b64) { setPreview(b64); setImgChanged(true); }
+      });
+    };
+
+    const clearImg = () => { setPreview(null); setImgChanged(true); };
+
+    const submit = async () => {
+      if (!form.title.trim() || !form.price.trim()) { alert("Title and price are required."); return; }
+      setSaving(true);
+      try {
+        await onSave(form, imgChanged ? preview : undefined, isEdit ? initial.id : null);
+      } catch (e) {
+        alert("Save failed: " + e.message);
+        setSaving(false);
+      }
+    };
+
+    return h(Modal, { onClose },
+      h(MHead, { title: isEdit ? "Edit Artwork" : "Add Artwork", sub: isEdit ? "Update the details below." : "Add a new piece to your collection." }),
+
+      h(Field, { label: "Title *" },
+        h("input", { value: form.title, onChange: setF("title"), placeholder: "e.g. Evening Bloom", autoFocus: true, style: inputSx })
+      ),
+      h(Field, { label: "Medium" },
+        h("input", { value: form.medium, onChange: setF("medium"), placeholder: "e.g. Oil on Canvas", style: inputSx })
+      ),
+      h(Field, { label: "Price *" },
+        h("input", { value: form.price, onChange: setF("price"), placeholder: "e.g. ₹18,000", style: inputSx })
+      ),
+      h(Field, { label: "Description" },
+        h("textarea", { value: form.desc, onChange: setF("desc"), placeholder: "A brief description of the piece…", rows: 3, style: { ...inputSx, resize: "vertical" }})
+      ),
+      h(Field, { label: "Artwork Image" },
+        preview
+          ? h("div", { style: { position: "relative" }},
+              h("img", { src: preview, alt: "preview", style: { width: "100%", height: 150, objectFit: "cover", borderRadius: 3 }}),
+              h("button", {
+                onClick: clearImg,
+                style: { position: "absolute", top: 6, right: 6, width: 24, height: 24, borderRadius: "50%", background: "rgba(0,0,0,0.68)", color: "white", border: "none", cursor: "pointer", fontSize: 15, lineHeight: "24px", textAlign: "center", padding: 0 },
+              }, "×")
+            )
+          : h("div", {
+              onClick: () => fileRef.current.click(),
+              style: { border: `2px dashed ${C.border}`, borderRadius: 3, padding: "24px", textAlign: "center", cursor: "pointer", color: C.char, opacity: 0.48, fontSize: 13 },
+            },
+              h("div", { style: { fontSize: 22, marginBottom: 4 }}, "↑"),
+              "Click to upload image"
+            ),
+        h("input", { ref: fileRef, type: "file", accept: "image/*", style: { display: "none" }, onChange: handleFile })
+      ),
+
+      IS_DEMO && h("p", { style: { fontFamily: sans, fontSize: 11, color: C.terra, background: "rgba(139,62,47,0.08)", padding: "8px 12px", borderRadius: 2, marginBottom: 14, lineHeight: 1.6 }},
+        "Demo mode — configure Firebase to enable persistent saves."
+      ),
+
+      h(ModalFooter, null,
+        h(Btn, { onClick: onClose }, "Cancel"),
+        h(Btn, { onClick: submit, v: "primary", disabled: saving }, saving ? "Saving…" : "Save Artwork")
+      )
+    );
+  }
+
+  // ── Toast ───────────────────────────────────────────────────────────────────
+  function Toast({ msg }) {
+    if (!msg) return null;
+    return h("div", {
+      style: { position: "fixed", bottom: 24, right: 24, background: C.deep, color: "white", fontFamily: sans, fontSize: 12, padding: "10px 18px", borderRadius: 2, zIndex: 1000, letterSpacing: "0.05em", boxShadow: "0 4px 24px rgba(0,0,0,0.2)", pointerEvents: "none" },
+    }, msg);
+  }
+
+  // ── Setup banner (demo mode) ────────────────────────────────────────────────
+  function SetupBanner() {
+    return h("div", {
+      style: { background: C.deep, color: "rgba(255,255,255,0.85)", fontFamily: sans, fontSize: 13, padding: "14px 40px", lineHeight: 1.7, letterSpacing: "0.02em" },
+    },
+      h("strong", { style: { color: C.ochre, letterSpacing: "0.08em", textTransform: "uppercase", fontSize: 10 }}, "Demo mode "),
+      "— Firebase not configured. Open this file, fill in FIREBASE_CONFIG and ADMIN_PASSCODE, then deploy. Sample artworks shown below."
+    );
+  }
+
+  // ── ArtCard ─────────────────────────────────────────────────────────────────
+  function ArtCard({ a, img, colorIdx, isAdmin, onEdit, onToggleSold, onDelete }) {
+    const bg = PH[colorIdx % PH.length];
+
+    return h("div", { className: "art-card", style: { background: C.card, border: `1px solid ${C.border}`, borderRadius: 4, overflow: "hidden" }},
+
+      // Image zone
+      h("div", { style: { height: 242, background: bg, position: "relative", overflow: "hidden" }},
+        img
+          ? h("img", { src: img, alt: a.title, style: { width: "100%", height: "100%", objectFit: "cover" }})
+          : h("div", { style: { width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6 }},
+              h("span", { style: { fontSize: 28, opacity: 0.14, color: C.char }}, "◻"),
+              h("span", { style: { fontFamily: serif, fontStyle: "italic", fontSize: 12, color: C.char, opacity: 0.22 }}, "No image yet")
+            ),
+        a.sold && h("div", { style: { position: "absolute", inset: 0, background: C.soldOv, display: "flex", alignItems: "center", justifyContent: "center" }},
+          h("span", { style: { fontFamily: sans, fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: "rgba(255,255,255,0.92)", fontWeight: 500 }}, "Sold")
+        )
+      ),
+
+      // Info zone
+      h("div", { style: { padding: "17px 18px 15px" }},
+        a.medium && h("div", { style: { fontFamily: sans, fontSize: 9, letterSpacing: "0.13em", textTransform: "uppercase", color: C.ochre, marginBottom: 4, fontWeight: 500 }}, a.medium),
+        h("h3", { style: { fontFamily: serif, fontSize: 17, fontWeight: 700, color: C.deep, lineHeight: 1.2, margin: `0 0 ${a.desc ? "6px" : "14px"}` }}, a.title),
+        a.desc && h("p", { style: { fontFamily: sans, fontSize: 12, color: C.char, opacity: 0.55, lineHeight: 1.65, margin: "0 0 12px", fontWeight: 300 }}, a.desc),
+
+        h("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 10, borderTop: `1px solid ${C.border}` }},
+          a.sold
+            ? h("span", { style: { fontFamily: sans, fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: C.terra, fontWeight: 500 }}, "Sold")
+            : h("span", { style: { fontFamily: serif, fontSize: 17, fontWeight: 700, color: C.deep }}, a.price),
+
+          a.sold
+            ? h("span", { style: { fontFamily: sans, fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", padding: "6px 13px", borderRadius: 2, background: "#C5BAB0", color: "white", display: "inline-flex", alignItems: "center", gap: 5, fontWeight: 500 }}, "Sold")
+            : h("a", { href: waLink(a), target: "_blank", rel: "noopener noreferrer",
+                style: { fontFamily: sans, fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", padding: "6px 13px", borderRadius: 2, background: C.deep, color: "white", display: "inline-flex", alignItems: "center", gap: 5, fontWeight: 500 }},
+                h(WaIcon), "Enquire"
+              )
+        ),
+
+        // Admin controls
+        isAdmin && h("div", { style: { display: "flex", gap: 5, marginTop: 10, flexWrap: "wrap" }},
+          h(Btn, { onClick: onEdit, small: true }, "Edit"),
+          h(Btn, { onClick: onToggleSold, small: true, style: { borderColor: C.ochre, color: C.ochre }}, a.sold ? "Mark Available" : "Mark Sold"),
+          h(Btn, { onClick: onDelete, small: true, v: "danger" }, "Delete")
+        )
+      )
+    );
+  }
+
+  // ── GallerySection ──────────────────────────────────────────────────────────
+  function GallerySection({ artworks, images, isAdmin, onEdit, onToggleSold, onDelete, onAdd }) {
+    const [filter, setFilter] = useState("all");
+    const visible = artworks.filter(a => filter === "available" ? !a.sold : filter === "sold" ? a.sold : true);
+
+    return h("div", null,
+
+      // Hero — public only
+      !isAdmin && h("div", { style: { textAlign: "center", padding: "72px 40px 52px" }, className: "section-pad" },
+        h("p", { style: { fontFamily: sans, fontSize: 9, letterSpacing: "0.3em", textTransform: "uppercase", color: C.ochre, marginBottom: 18 }},
+          "Original Works · Commissions · Tanjore · Watercolour"),
+        h("h1", { className: "hero-h1", style: { fontFamily: serif, fontSize: "clamp(40px,6.5vw,82px)", fontWeight: 700, color: C.deep, lineHeight: 1.06, margin: "0 0 20px" }},
+          "Art that ", h("em", { style: { fontStyle: "italic", color: C.ochre }}, "speaks"), h("br", null), "before words do."
+        ),
+        h("p", { style: { fontFamily: sans, fontSize: 15, fontWeight: 300, color: C.char, opacity: 0.62, maxWidth: 400, margin: "0 auto 36px", lineHeight: 1.8 }},
+          "Each painting is a meditation — colour, feeling, and form in quiet dialogue with the world."),
+        h("div", { style: { width: 44, height: 1, background: C.ochre, margin: "0 auto" }})
+      ),
+
+      // Toolbar
+      h("div", { className: "section-pad", style: { padding: isAdmin ? "20px 40px 26px" : "4px 40px 26px", maxWidth: 1340, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }},
+        h("h2", { style: { fontFamily: serif, fontSize: 21, fontWeight: 600, color: C.deep }},
+          isAdmin ? "Manage Collection" : "The Collection",
+          h("span", { style: { fontFamily: sans, fontSize: 12, fontWeight: 400, color: C.ochre, marginLeft: 10 }}, visible.length + " work" + (visible.length !== 1 ? "s" : ""))
+        ),
+        h("div", { style: { display: "flex", gap: 5 }},
+          ...["all", "available", "sold"].map(f =>
+            h("button", {
+              key: f, onClick: () => setFilter(f),
+              style: { fontFamily: sans, fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase", padding: "5px 14px", borderRadius: 20, border: `1px solid ${filter === f ? C.ochre : C.border}`, background: filter === f ? C.ochre : "transparent", color: filter === f ? "white" : C.char, cursor: "pointer", fontWeight: filter === f ? 500 : 400, transition: "all 0.15s" },
+            }, f.charAt(0).toUpperCase() + f.slice(1))
+          )
+        )
+      ),
+
+      // Grid
+      h("div", { className: "section-pad", style: { padding: "0 40px 80px", maxWidth: 1340, margin: "0 auto" }},
+        visible.length === 0 && !isAdmin
+          && h("div", { style: { textAlign: "center", padding: "80px 20px", fontFamily: serif, fontStyle: "italic", fontSize: 18, color: C.char, opacity: 0.28 }}, "No works in this category."),
+
+        h("div", { className: "gallery-grid", style: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: 26 }},
+          ...visible.map((a, i) =>
+            h(ArtCard, { key: a.id, a, img: images[a.id], colorIdx: i, isAdmin,
+              onEdit:       () => onEdit(a),
+              onToggleSold: () => onToggleSold(a.id, a.sold),
+              onDelete:     () => onDelete(a.id),
+            })
+          ),
+
+          // Add-card (admin only)
+          isAdmin && h("div", {
+            key: "__add", onClick: onAdd,
+            style: { border: `2px dashed ${C.border}`, borderRadius: 4, minHeight: 340, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, cursor: "pointer", color: C.ochre, fontFamily: sans, fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", transition: "all 0.2s" },
+            onMouseEnter: ev => { ev.currentTarget.style.borderColor = C.ochre; ev.currentTarget.style.background = C.ochreA; },
+            onMouseLeave: ev => { ev.currentTarget.style.borderColor = C.border; ev.currentTarget.style.background = "transparent"; },
+          },
+            h("span", { style: { fontSize: 26, lineHeight: 1, fontWeight: 300 }}, "+"),
+            "Add Artwork"
+          )
+        )
+      )
+    );
+  }
+
+  // ── AboutSection ────────────────────────────────────────────────────────────
+  function AboutSection() {
+    const paras = [
+      "From the tangerine hues of an evening sun to the serene setting of a forest lake — Asha Prasad's repertoire on canvas speaks to anyone who pauses to truly look. Her works charm with a beautiful play of bright, subtle hues and earthy settings, and with lyrical, evocative, and sensuous lines.",
+      "It was the portrait of a departed father-in-law — which moved his widow to say it looked \u201cvery realistic and lifelike\u201d — that pushed Asha to immerse herself completely in the world of art. A serious hobby became a lifelong calling.",
+      "Beyond original works inspired by nature and society, Asha creates stunning abstract pieces and reproductions drawn from masters like Renoir, Hans Johann Wagner, Ingrid Sehl, and Alfred Gockel. Tanjore and crochet too \u2014 wherever her Muse leads.",
+      "Her works hang in hotels across India and Sri Lanka \u2014 including the Taj Group \u2014 private collections, and business houses. Exhibited in Delhi, Chennai, and Surat. She also teaches art to children, orphanages, those with special needs, and senior citizens.",
+    ];
+    const tags = ["Oil on Canvas","Watercolour","Tanjore","Abstract","Portraits","Crochet"];
+
+    return h("div", { className: "section-pad", style: { padding: "68px 40px 80px", maxWidth: 980, margin: "0 auto" }},
+      h("div", { className: "about-grid", style: { display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1.65fr)", gap: 72, alignItems: "start" }},
+
+        // Left
+        h("div", null,
+          h("p", { style: { fontFamily: sans, fontSize: 9, letterSpacing: "0.28em", textTransform: "uppercase", color: C.ochre, marginBottom: 14, fontWeight: 500 }}, "The Artist"),
+          h("h2", { style: { fontFamily: serif, fontSize: 40, fontWeight: 700, color: C.deep, lineHeight: 1.04, marginBottom: 10 }},
+            "Asha", h("br", null), h("em", { style: { fontStyle: "italic", color: C.ochre }}, "Prasad")
+          ),
+          h("p", { style: { fontFamily: sans, fontSize: 13, color: C.char, opacity: 0.5, fontWeight: 300, marginBottom: 28 }}, "Self-taught artist \u00b7 Oil, Watercolour, Tanjore, Crochet"),
+
+          h("div", { style: { borderTop: `1px solid ${C.border}`, paddingTop: 24, display: "flex", gap: 30, marginBottom: 28 }},
+            ...[["800+","Paintings sold"],["Taj","Group & more"],["3","Cities exhibited"]].map(([n, l]) =>
+              h("div", { key: l },
+                h("span", { style: { fontFamily: serif, fontSize: 26, fontWeight: 700, color: C.ochre, display: "block" }}, n),
+                h("span", { style: { fontFamily: sans, fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase", color: C.char, opacity: 0.45 }}, l)
+              )
+            )
+          ),
+
+          h("div", { style: { padding: "14px 18px", background: C.ochreA, borderLeft: `2px solid ${C.ochre}`, borderRadius: 2 }},
+            h("p", { style: { fontFamily: serif, fontStyle: "italic", fontSize: 15, color: C.deep, lineHeight: 1.72, margin: 0 }}, "\u201cPainting for me is akin to meditation.\u201d"),
+            h("p", { style: { fontFamily: sans, fontSize: 10, color: C.char, opacity: 0.4, marginTop: 7, letterSpacing: "0.05em" }}, "\u2014 Asha Prasad")
+          )
+        ),
+
+        // Right
+        h("div", null,
+          ...paras.map((p, i) => h("p", { key: i, style: { fontFamily: sans, fontSize: 15, color: C.char, lineHeight: 1.88, marginBottom: 18, opacity: 0.8, fontWeight: 300 }}, p)),
+          h("div", { style: { display: "flex", gap: 7, flexWrap: "wrap", marginTop: 8 }},
+            ...tags.map(tag =>
+              h("span", { key: tag, style: { fontFamily: sans, fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", padding: "4px 12px", border: `1px solid ${C.border}`, borderRadius: 20, color: C.char, opacity: 0.6 }}, tag)
+            )
+          )
+        )
+      )
+    );
+  }
+
+  // ── App root ─────────────────────────────────────────────────────────────────
+  function App() {
+    const [artworks, setArtworks] = useState(IS_DEMO ? DEMO_ARTWORKS : []);
+    const [images,   setImages]   = useState({});
+    const [loading,  setLoading]  = useState(!IS_DEMO);
+    const [isAdmin,  setIsAdmin]  = useState(false);
+    const [section,  setSection]  = useState("gallery");
+    const [modal,    setModal]    = useState(null); // null | login | artwork
+    const [editing,  setEditing]  = useState(null);
+    const [toast,    setToast]    = useState(null);
+    const toastRef = useRef();
+
+    // ── Firebase subscriptions ─────────────────────────────────────────────
+    useEffect(() => {
+      if (IS_DEMO) return;
+
+      let awReady = false, imgReady = false;
+      const done = () => { if (awReady && imgReady) setLoading(false); };
+
+      const unsubAW = DB.sub("artworks", val => {
+        const list = val
+          ? Object.entries(val).map(([id, v]) => ({ ...v, id })).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))
+          : [];
+        setArtworks(list);
+        awReady = true; done();
+      });
+
+      const unsubImg = DB.sub("images", val => {
+        setImages(val || {});
+        imgReady = true; done();
+      });
+
+      return () => { unsubAW(); unsubImg(); };
+    }, []);
+
+    // ── Toast ──────────────────────────────────────────────────────────────
+    function notify(msg) {
+      if (toastRef.current) clearTimeout(toastRef.current);
+      setToast(msg);
+      toastRef.current = setTimeout(() => setToast(null), 2800);
+    }
+
+    // ── CRUD ───────────────────────────────────────────────────────────────
+    async function handleSave(form, newImgB64, existingId) {
+      const id   = existingId || ("art_" + Date.now());
+      const prev = existingId ? artworks.find(a => a.id === existingId) : null;
+
+      const data = {
+        title:     form.title,
+        medium:    form.medium || "",
+        price:     form.price,
+        desc:      form.desc   || "",
+        sold:      prev?.sold  || false,
+        hasImage:  newImgB64 !== undefined ? !!newImgB64 : (prev?.hasImage || false),
+        createdAt: prev?.createdAt || Date.now(),
+      };
+
+      if (!IS_DEMO) {
+        await DB.set("artworks/" + id, data);
+        if (newImgB64 !== undefined) {
+          if (newImgB64) { await DB.set("images/" + id, newImgB64); }
+          else           { await DB.remove("images/" + id); }
+        }
+      }
+
+      setModal(null); setEditing(null);
+      notify(existingId ? "Artwork updated" : "Artwork added");
+    }
+
+    async function handleToggleSold(id, currentSold) {
+      if (!IS_DEMO) await DB.update("artworks/" + id, { sold: !currentSold });
+      else setArtworks(p => p.map(a => a.id === id ? { ...a, sold: !a.sold } : a));
+      notify(!currentSold ? "Marked as sold" : "Marked as available");
+    }
+
+    async function handleDelete(id) {
+      if (!confirm("Remove this artwork from the gallery?")) return;
+      if (!IS_DEMO) {
+        await DB.remove("artworks/" + id);
+        await DB.remove("images/" + id);
+      } else {
+        setArtworks(p => p.filter(a => a.id !== id));
+      }
+      notify("Artwork removed");
+    }
+
+    // ── Render ─────────────────────────────────────────────────────────────
+    if (loading) {
+      return h("div", { style: { minHeight: "100vh", background: C.cream, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: serif, fontSize: 18, color: C.ochre, fontStyle: "italic" }},
+        "Loading gallery\u2026"
+      );
+    }
+
+    return h("div", { style: { minHeight: "100vh", background: C.cream }},
+
+      // ── Modals ─────────────────────────────────────────────────────────
+      modal === "login"   && h(LoginModal, { onSuccess: () => { setIsAdmin(true); setModal(null); notify("Admin mode on"); }, onClose: () => setModal(null) }),
+      modal === "artwork" && h(ArtworkFormModal, {
+        initial:     editing,
+        existingImg: editing ? images[editing.id] : null,
+        onSave:      handleSave,
+        onClose:     () => { setModal(null); setEditing(null); },
+      }),
+
+      // ── Demo banner ────────────────────────────────────────────────────
+      IS_DEMO && h(SetupBanner),
+
+      // ── Nav ────────────────────────────────────────────────────────────
+      h("nav", { className: "nav-pad", style: { background: "rgba(244,239,230,0.97)", borderBottom: `1px solid ${C.border}`, padding: "0 40px", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 200, backdropFilter: "blur(10px)" }},
+        h("div", { onClick: () => setSection("gallery"), style: { fontFamily: serif, fontSize: 19, fontWeight: 700, color: C.deep, cursor: "pointer", userSelect: "none" }},
+          "Asha ", h("span", { style: { fontStyle: "italic", color: C.ochre }}, "Arthouse")
+        ),
+        h("div", { style: { display: "flex", gap: 28, alignItems: "center" }},
+          ...["gallery", "about"].map(s =>
+            h("button", { key: s, onClick: () => setSection(s), style: { fontFamily: sans, fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", background: "none", border: "none", cursor: "pointer", color: section === s ? C.ochre : C.char, opacity: section === s ? 1 : 0.6, fontWeight: section === s ? 500 : 400, padding: "4px 0", borderBottom: section === s ? `1px solid ${C.ochre}` : "1px solid transparent", transition: "all 0.15s" }},
+              s.charAt(0).toUpperCase() + s.slice(1)
+            )
+          ),
+          h("button", {
+            onClick:  () => isAdmin ? setIsAdmin(false) : setModal("login"),
+            title:    isAdmin ? "Exit admin" : "Admin login",
+            style: { width: 34, height: 34, borderRadius: "50%", border: `1.5px solid ${isAdmin ? C.ochre : C.border}`, background: isAdmin ? C.ochre : "transparent", color: isAdmin ? "white" : C.char, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, transition: "all 0.18s" },
+          }, "\u2699")
+        )
+      ),
+
+      // ── Admin bar ──────────────────────────────────────────────────────
+      isAdmin && h("div", { className: "nav-pad", style: { background: C.deep, padding: "10px 40px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }},
+        h("span", { style: { fontFamily: sans, fontSize: 9, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.38)" }}, "Admin"),
+        h(Btn, { onClick: () => { setEditing(null); setModal("artwork"); }, v: "ochre", small: true }, "+ Add Artwork"),
+        h(Btn, { onClick: () => setIsAdmin(false), small: true, style: { borderColor: "rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.6)", marginLeft: "auto" }}, "Exit Admin")
+      ),
+
+      // ── Sections ───────────────────────────────────────────────────────
+      section === "gallery" && h(GallerySection, {
+        artworks, images, isAdmin,
+        onEdit:       a  => { setEditing(a); setModal("artwork"); },
+        onToggleSold: handleToggleSold,
+        onDelete:     handleDelete,
+        onAdd:        () => { setEditing(null); setModal("artwork"); },
+      }),
+      section === "about" && h(AboutSection),
+
+      // ── Footer ─────────────────────────────────────────────────────────
+      h("footer", { style: { textAlign: "center", padding: "26px 40px", borderTop: `1px solid ${C.border}`, fontFamily: sans, fontSize: 11, color: C.char, opacity: 0.36, letterSpacing: "0.06em" }},
+        "\u00a9 Asha Arthouse \u00b7 All works original unless stated \u00b7 Enquiries via WhatsApp +91\u00a085930\u00a020077"
+      ),
+
+      h(Toast, { msg: toast })
+    );
+  }
+
+  ReactDOM.render(h(App), document.getElementById("root"));
+})();
+</script>
+</body>
+</html>
